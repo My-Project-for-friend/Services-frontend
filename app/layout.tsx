@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import AuthLayout from "@/components/layout/AuthLayout";
+import MainLayout from "@/components/layout/MainLayout";
+import { Providers } from "@/redux/Providers";
+import { ToastProvider } from "@/components/ToastProvider";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,12 +28,27 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isAuthPage = (children as any).type?.isAuth;
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-black dark:bg-gray-900 dark:text-white`}
       >
-        {children}
+        <Providers>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ToastProvider />
+            {isAuthPage ? (
+              <AuthLayout>{children}</AuthLayout>
+            ) : (
+              <MainLayout>{children}</MainLayout>
+            )}
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   );
