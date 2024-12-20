@@ -4,7 +4,7 @@ import { Document, ObjectId } from "mongoose";
 export interface IPost extends Document {
   _id?: ObjectId;
   userId?: ObjectId; // Reference to the user
-  images?: string[]; // Array of image URLs
+  images?: File[]; // Array of image URLs
   description?: string;
   typeOfService?: Array<
     "Call Girls" | "Transsexual" | "Massage" | "Adult Meetings" | "Male Escorts"

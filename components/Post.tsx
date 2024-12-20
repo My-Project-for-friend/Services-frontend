@@ -12,11 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { useCreatePostMutation } from "@/redux/api/postApi";
 import { toast } from "react-toastify";
-import cities from "@/dataset/in.json";
+import cities from "@/dataset/cities.json";
 import nationalities from "@/dataset/nationalities.json";
 import { ApiResponse } from "@/interfaces/apiResponse.interface";
 import { IPost } from "@/interfaces/post.interface";
 import transformFormDataToIPost from "@/helpers/TransformFormDataToIPost";
+import { FormData } from "@/interfaces/formData.interface";
+import validateForm from "@/helpers/validateForm";
 const SERVICES = [
   "Oral",
   "Anal",
@@ -54,25 +56,6 @@ const TYPE_OF_SERVICE = [
   "Male Escorts",
 ];
 
-interface FormData {
-  description: string;
-  images: File[];
-  typeOfService: string[];
-  breastType: string;
-  hairType: string;
-  bodyType: string;
-  services: string[];
-  attentionTo: string[];
-  placeOfService: string[];
-  phoneNo: string;
-  paymentMethods: string[];
-  perHourRate: string;
-  city: string;
-  state: string;
-  ethnicity: string;
-  nationality: string;
-}
-
 type ValidationErrors = Partial<Record<keyof FormData, string>>;
 
 type CreatePostDialogProps = {
@@ -82,8 +65,9 @@ type CreatePostDialogProps = {
 const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
   const [formData, setFormData] = useState<FormData>({
     description: "",
+    title: "",
     images: [],
-    typeOfService: "",
+    typeOfService: [],
     breastType: "",
     hairType: "",
     bodyType: "",
@@ -102,59 +86,30 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
+  const states = [...new Set(cities.map((city) => city.state))];
+
   const [createPost] = useCreatePostMutation();
 
-  const validateForm = (data: FormData): ValidationErrors => {
-    const newErrors: ValidationErrors = {};
-
-    if (!data.description) {
-      newErrors.description = "Description is required.";
-    }
-
-    if (!data.typeOfService) {
-      newErrors.typeOfService = "Type of service is required.";
-    }
-
-    if (!data.phoneNo || !/^\d{10,15}$/.test(data.phoneNo)) {
-      newErrors.phoneNo = "Phone number must be 10-15 digits.";
-    }
-
-    if (data.paymentMethods.length === 0) {
-      newErrors.paymentMethods = "Select at least one payment method.";
-    }
-
-    if (!data.perHourRate || isNaN(Number(data.perHourRate))) {
-      newErrors.perHourRate = "Per hour rate must be a valid number.";
-    }
-
-    if (!data.ethnicity) {
-      newErrors.ethnicity = "Select Ethnicity.";
-    }
-
-    if (!data.nationality) {
-      newErrors.nationality = "Select Nationality.";
-    }
-
-    if (!data.city) {
-      newErrors.city = "Select City.";
-    }
-
-    if (!data.state) {
-      newErrors.state = "Select State.";
-    }
-
-    return newErrors;
-  };
+  const filteredCities = cities
+    .filter((city) => city.state === formData.state)
+    .map((city) => city.name as string);
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "state" ? { city: "" } : {}), // Reset city when state changes
+    }));
+
+    // console.log(filteredCities);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      console.log(e.target.files);
       const files = Array.from(e.target.files);
       setFormData({ ...formData, images: files });
 
@@ -179,30 +134,59 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    // Validate the form data
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length === 0) {
-      try {
-        console.log("Form submitted successfully!", formData);
-        const response = await createPost(transformFormDataToIPost(formData));
-        console.log("Post created:", response);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred";
-        console.error("Submit Error:", errorMessage);
-        toast.error(errorMessage);
+    // Stop if there are validation errors
+    if (Object.keys(validationErrors).length > 0) {
+      toast.warning("Please fix the errors in the form.");
+      return;
+    }
+
+    try {
+      // Prepare the FormData object
+      const formDataPayload = new FormData();
+
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "images") {
+          // Append each image file individually
+          (value as File[]).forEach((file) => {
+            formDataPayload.append("images", file);
+          });
+        } else if (Array.isArray(value)) {
+          // For array fields, append each item separately
+          value.forEach((item) => formDataPayload.append(key, item));
+        } else {
+          // Append simple string fields
+          formDataPayload.append(key, value as string);
+        }
+      });
+
+      // Debugging FormData (Iterate to inspect content)
+      for (const pair of formDataPayload.entries()) {
+        console.log(pair[0], pair[1]);
       }
-    } else {
-      console.log("Validation failed", validationErrors);
+      console.log(formDataPayload);
+
+      // Make the API call
+      const res = await createPost(formData).unwrap();
+      console.log("Response:", res);
+
+      // Success notification
+      toast.success("Post created successfully!");
+      onClose(); // Close dialog on success
+    } catch (error) {
+      console.error("Error creating post:", error);
+      toast.error("Failed to create post. Please try again.");
     }
   };
 
   useEffect(() => {
-    console.log("Effect runs here");
-  }, []);
+    return () => {
+      imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviews]);
 
   return (
     <Dialog open={true} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -243,6 +227,16 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
 
           {/* Description */}
           <TextareaField
+            label="Title"
+            name="title"
+            placeholder="Write a detailed Title here..."
+            value={formData.title}
+            onChange={handleInputChange}
+          />
+          {errors.title && <p className="error-text">{errors.title}</p>}
+
+          {/* Description */}
+          <TextareaField
             label="Description"
             name="description"
             placeholder="Write a detailed description here..."
@@ -257,7 +251,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SelectField
               label="Ethnicity"
-              options={TYPE_OF_SERVICE}
+              options={nationalities}
               name="ethnicity"
               value={formData.ethnicity}
               onChange={handleInputChange}
@@ -267,9 +261,9 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             )}
             <SelectField
               label="Nationality"
-              options={BREAST_TYPE}
+              options={nationalities}
               name="nationality"
-              value={formData.ethnicity}
+              value={formData.nationality}
               onChange={handleInputChange}
             />
             {errors.nationality && (
@@ -277,7 +271,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             )}
             <SelectField
               label="State"
-              options={HAIR_TYPE}
+              options={states}
               name="state"
               value={formData.state}
               onChange={handleInputChange}
@@ -287,7 +281,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             )}
             <SelectField
               label="City"
-              options={BODY_TYPE}
+              options={filteredCities}
               name="city"
               value={formData.city}
               onChange={handleInputChange}

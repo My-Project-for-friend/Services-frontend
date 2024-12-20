@@ -32,6 +32,8 @@ const LoginPage = () => {
         token: string;
       }>;
 
+      console.log(res);
+
       if ("error" in res) {
         const errorMessage =
           (res.error as { message: string }).message || "Something went wrong";
@@ -41,7 +43,7 @@ const LoginPage = () => {
 
       // console.log(res.data.success);
       // Check if response is unsuccessful
-      if (!res.data.user || !res.data.token) {
+      if (!res.data.data.user || !res.data.data.token) {
         toast.error("Invalid login response");
         return;
       }
@@ -52,8 +54,8 @@ const LoginPage = () => {
       // Log the API response data for debugging
       console.log("Response Data:", res.data);
 
-      localStorage.setItem("token", res.data.token);
-      dispatch(setUser(res.data.user));
+      localStorage.setItem("token", res.data.data.token);
+      dispatch(setUser(res.data.data.user));
 
       router.push("/");
     } catch (error: unknown) {
