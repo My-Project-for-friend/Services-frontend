@@ -9,10 +9,12 @@ import {
 } from "react-icons/fa";
 import { BiShieldAlt2 } from "react-icons/bi";
 import { AiOutlineFlag, AiOutlineShareAlt } from "react-icons/ai";
+// import CreatePostDialog from "@/components/Post";
 
 const ServiceDetails = () => {
   return (
     <div className="bg-gray-50 min-h-screen dark:bg-gray-900">
+      {/* <CreatePostDialog /> */}
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10 dark:bg-gray-800">
         <div className="container mx-auto flex justify-between items-center py-4 px-6">

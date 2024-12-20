@@ -38,6 +38,8 @@ const SearchModal = ({ onClose }) => {
               <option>Call Girls</option>
               <option>Massages</option>
               <option>Male Escorts</option>
+              <option>Transsexual</option>
+              <option>Adult Meetings</option>
             </select>
             <input
               type="text"

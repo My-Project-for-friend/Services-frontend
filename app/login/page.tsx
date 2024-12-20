@@ -1,35 +1,67 @@
 // pages/login.tsx
 "use client";
-import { useRouter } from "next/router";
-import React, { useState } from "react";
+import React, { FormEvent, useState } from "react";
 import { useLoginMutation } from "@/redux/api/authApi";
 import { User } from "@/interfaces/user.interface";
 import Link from "next/link";
 import { toast } from "react-toastify";
+import { ApiResponse } from "@/interfaces/apiResponse.interface";
+import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
+import { setUser } from "@/redux/slices/userSlice";
 
-export default function LoginPage() {
+const LoginPage = () => {
   const [values, setValues] = useState<User>({ email: "", password: "" });
-  // const router = useRouter(); // Ensure the component is in pages/ or rendered correctly.
-
+  const router = useRouter(); // Ensure the component is in pages/ or rendered correctly.
+  const dispatch = useDispatch();
   const [loginUser] = useLoginMutation();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    toast.success("applied");
+
     try {
-      if (!values.email || !values.password) {
+      // Validate input values
+      if (!values.email.trim() || !values.password.trim()) {
         toast.error("Email and password are required.");
         return;
       }
-      const res = await loginUser(values);
-      if (res.error) {
-        toast.error(res.error.message || "Something went wrong");
+
+      // Call the login API
+      const res = (await loginUser(values)) as ApiResponse<{
+        user: User;
+        token: string;
+      }>;
+
+      if ("error" in res) {
+        const errorMessage =
+          (res.error as { message: string }).message || "Something went wrong";
+        toast.error(errorMessage);
         return;
       }
+
+      // console.log(res.data.success);
+      // Check if response is unsuccessful
+      if (!res.data.user || !res.data.token) {
+        toast.error("Invalid login response");
+        return;
+      }
+
+      // Display success toast
       toast.success("Login successful!");
-      // router.push("/");
+
+      // Log the API response data for debugging
+      console.log("Response Data:", res.data);
+
+      localStorage.setItem("token", res.data.token);
+      dispatch(setUser(res.data.user));
+
+      router.push("/");
     } catch (error: unknown) {
-      console.log(error.message);
+      // Enhanced error handling
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      console.error("Login Error:", errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -89,7 +121,7 @@ export default function LoginPage() {
             </button>
           </form>
           <p className="mt-4 text-sm text-center text-gray-600 dark:text-gray-400">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <span className="text-purple-600 hover:underline dark:text-purple-400">
               <Link href="/register">Register here</Link>
             </span>
@@ -98,6 +130,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
-}
+};
 
 LoginPage.isAuth = true;
+
+export default LoginPage;

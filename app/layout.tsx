@@ -4,8 +4,8 @@ import "./globals.css";
 import AuthLayout from "@/components/layout/AuthLayout";
 import MainLayout from "@/components/layout/MainLayout";
 import { Providers } from "@/redux/Providers";
-import { ToastProvider } from "@/components/ToastProvider";
 import { ThemeProvider } from "@/components/theme-provider";
+import ToastProvider from "@/components/ToastProvider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -41,12 +41,13 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <ToastProvider />
-            {isAuthPage ? (
-              <AuthLayout>{children}</AuthLayout>
-            ) : (
-              <MainLayout>{children}</MainLayout>
-            )}
+            <ToastProvider>
+              {isAuthPage ? (
+                <AuthLayout>{children}</AuthLayout>
+              ) : (
+                <MainLayout>{children}</MainLayout>
+              )}
+            </ToastProvider>
           </ThemeProvider>
         </Providers>
       </body>

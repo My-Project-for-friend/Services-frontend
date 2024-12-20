@@ -1,8 +1,10 @@
 "use client";
+import { ApiResponse } from "@/interfaces/apiResponse.interface";
 import { User } from "@/interfaces/user.interface";
 import { useRegisterMutation } from "@/redux/api/authApi";
 import Link from "next/link";
-import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import React, { FormEvent, useState } from "react";
 import { toast } from "react-toastify";
 
 export default function RegisterPage() {
@@ -12,28 +14,38 @@ export default function RegisterPage() {
     name: "",
     phone: "",
   });
-  // const router = useRouter(); // Ensure the component is in pages/ or rendered correctly.
 
+  const router = useRouter();
   const [registerUser] = useRegisterMutation();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     try {
       if (!values.email || !values.password || !values.name || !values.phone) {
         toast.error("All fields are required.");
         return;
       }
-      const res = await registerUser(values);
-      if (res.error) {
-        toast.error(res.error.message || "Something went wrong");
+
+      const res: ApiResponse<{ user: User; token: string }> =
+        await registerUser(values);
+
+      if (!res.data.success) {
+        toast.error(res.message || "Something went wrong");
         return;
       }
-      toast.success("Register successful!");
-      // router.push("/");
+
+      toast.success("Registration successful!");
+      localStorage.setItem("token", res.data.token);
+
+      // Use router.push to redirect
+      router.push("/");
     } catch (error: unknown) {
-      console.log(error.message);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      toast.error(errorMessage);
     }
   };
+
   return (
     <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* Image Section */}
@@ -132,5 +144,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-RegisterPage.isAuth = true;

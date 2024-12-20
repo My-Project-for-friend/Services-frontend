@@ -1,15 +1,16 @@
 import { createApi,  fetchBaseQuery,  } from "@reduxjs/toolkit/query/react";
 import { User } from "@/interfaces/user.interface";
+import { IPost } from "@/interfaces/post.interface";
 
 const authApi=createApi({
-    reducerPath: "auth",
-    baseQuery: fetchBaseQuery({baseUrl:`${process.env.NEXT_PUBLIC_BASE_URL}/auth`}),
+    reducerPath: "post",
+    baseQuery: fetchBaseQuery({baseUrl:`${process.env.NEXT_PUBLIC_BASE_URL}/post`}),
     endpoints: (builder)=>({
-        register:builder.mutation({
-            query:(user:User)=>({
-                url:"/register",
+        createPost:builder.mutation({
+            query:(post:IPost)=>({
+                url:"/create",
                 method:"POST",
-                body:user
+                body:post
             }),
 
         }),
@@ -25,5 +26,5 @@ const authApi=createApi({
     
 })
 
-export const {useLoginMutation,useRegisterMutation}=authApi;
+export const {useLoginMutation,useCreatePostMutation}=authApi;
 export default authApi;

@@ -23,10 +23,10 @@ const Hero = () => {
         }}
       >
         <div className="text-center">
-          <h1 className="text-4xl text-gray-900 dark:text-gray-200 font-bold mb-4">
+          <h1 className="text-4xl text-gray-900  font-bold mb-4">
             Welcome to Our Company
           </h1>
-          <p className="text-lg mb-6 text-gray-900 dark:text-gray-300 font-bold">
+          <p className="text-lg mb-6 text-gray-900  font-bold">
             Providing top-notch services tailored to your needs.
           </p>
           <div className="flex justify-center items-center space-x-4">
