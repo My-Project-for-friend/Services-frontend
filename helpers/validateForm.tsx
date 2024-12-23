@@ -1,7 +1,7 @@
-import { FormData } from "@/interfaces/formData.interface";
-type ValidationErrors = Partial<Record<keyof FormData, string>>;
+import { FormPostData } from "@/interfaces/formData.interface";
+type ValidationErrors = Partial<Record<keyof FormPostData, string>>;
 
-const validateForm = (data: FormData): ValidationErrors => {
+const validateForm = (data: FormPostData): ValidationErrors => {
   const newErrors: ValidationErrors = {};
 
   if (!data.description) {
@@ -29,10 +29,6 @@ const validateForm = (data: FormData): ValidationErrors => {
 
   if (!data.ethnicity) {
     newErrors.ethnicity = "Select Ethnicity.";
-  }
-
-  if (!data.nationality) {
-    newErrors.nationality = "Select Nationality.";
   }
 
   if (!data.city) {

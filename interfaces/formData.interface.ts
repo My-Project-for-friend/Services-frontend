@@ -1,7 +1,8 @@
-export interface FormData {
+export interface FormPostData {
   title: string;
   description: string;
-  images: File[];
+  age:string;
+  images: Array<{ originalname?: string; base64?: string; mimetype?: string }>;
   typeOfService: string[];
   breastType: string;
   hairType: string;
@@ -15,5 +16,4 @@ export interface FormData {
   city: string;
   state: string;
   ethnicity: string;
-  nationality: string;
 }

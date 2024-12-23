@@ -1,9 +1,7 @@
 "use client";
-import { useEffect, useState, ChangeEvent, FormEvent } from "react";
+import { useEffect, useState, ChangeEvent, FormEvent, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,55 +15,35 @@ import nationalities from "@/dataset/nationalities.json";
 import { ApiResponse } from "@/interfaces/apiResponse.interface";
 import { IPost } from "@/interfaces/post.interface";
 import transformFormDataToIPost from "@/helpers/TransformFormDataToIPost";
-import { FormData } from "@/interfaces/formData.interface";
 import validateForm from "@/helpers/validateForm";
-const SERVICES = [
-  "Oral",
-  "Anal",
-  "BDSM",
-  "Girlfriend Experience",
-  "Porn actresses",
-  "Body ejaculation",
-  "Erotic Massage",
-  "Tantric Massage",
-  "Fetish",
-  "French Kiss",
-  "Role Play",
-  "Threesome",
-  "Sexting",
-  "Video call",
-];
+import SERVICES from "@/dataset/services.json";
+import ATTENTION_TO from "@/dataset/attention.json";
+import PLACE_OF_SERVICE from "@/dataset/place-of-service.json";
+import HAIR_TYPE from "@/dataset/hair-type.json";
+import BODY_TYPE from "@/dataset/body-type.json";
+import BREAST_TYPE from "@/dataset/breast-type.json";
+import PAYMENT_METHODS from "@/dataset/payment-methods.json";
+import TYPE_OF_SERVICE from "@/dataset/type-of-service.json";
+import {
+  CheckboxGroup,
+  InputField,
+  SelectField,
+  TextareaField,
+} from "@/helpers/InputDatas";
+import axios from "axios";
+import { FormPostData } from "@/interfaces/formData.interface";
 
-const ATTENTION_TO = ["Men", "Women", "Couples", "Disabled"];
-const PLACE_OF_SERVICE = [
-  "At home",
-  "Events and Parties",
-  "Hotel/Motel",
-  "Clubs",
-  "OutCall",
-];
-const HAIR_TYPE = ["Blond Hair", "Black Hair", "Red Hair", "Brown Hair"];
-const BODY_TYPE = ["Slim", "Curvy"];
-const BREAST_TYPE = ["Busty", "Natural Boobs"];
-const PAYMENT_METHODS = ["Cash", "Credit Card", "UPI"];
-const TYPE_OF_SERVICE = [
-  "Call Girls",
-  "Transsexual",
-  "Massage",
-  "Adult Meetings",
-  "Male Escorts",
-];
-
-type ValidationErrors = Partial<Record<keyof FormData, string>>;
+type ValidationErrors = Partial<Record<keyof FormPostData, string>>;
 
 type CreatePostDialogProps = {
   onClose: () => void; // Function with no parameters and no return value
 };
 
 const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormPostData>({
     description: "",
     title: "",
+    age: "",
     images: [],
     typeOfService: [],
     breastType: "",
@@ -80,19 +58,23 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
     city: "",
     state: "",
     ethnicity: "",
-    nationality: "",
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Track submission status
 
-  const states = [...new Set(cities.map((city) => city.state))];
+  const filteredCities = useMemo(() => {
+    return cities
+      .filter((city) => city.state === formData.state)
+      .map((city) => city.name);
+  }, [formData.state]);
+
+  const states = useMemo(() => {
+    return [...new Set(cities.map((city) => city.state))];
+  }, []);
 
   const [createPost] = useCreatePostMutation();
-
-  const filteredCities = cities
-    .filter((city) => city.state === formData.state)
-    .map((city) => city.name as string);
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -103,23 +85,33 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
       [name]: value,
       ...(name === "state" ? { city: "" } : {}), // Reset city when state changes
     }));
-
-    // console.log(filteredCities);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      console.log(e.target.files);
       const files = Array.from(e.target.files);
-      setFormData({ ...formData, images: files });
 
-      const previews = files.map((file) => URL.createObjectURL(file));
+      const validFiles = files.filter((file) => {
+        const isValidImage = file.type.startsWith("image/"); // Check if file is an image
+        const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB
+        return isValidImage && isValidSize;
+      });
+
+      if (validFiles.length < files.length) {
+        toast.warning(
+          "Some files were not uploaded due to invalid format or size."
+        );
+      }
+
+      setFormData({ ...formData, images: validFiles });
+
+      const previews = validFiles.map((file) => URL.createObjectURL(file));
       setImagePreviews(previews);
     }
   };
 
   const handleCheckboxChange = (
-    field: keyof FormData,
+    field: keyof FormPostData,
     value: string,
     checked: boolean
   ) => {
@@ -133,52 +125,76 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    console.log("submitting");
 
-    // Validate the form data
+    setIsSubmitting(true); // Set submitting state to true
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
 
-    // Stop if there are validation errors
     if (Object.keys(validationErrors).length > 0) {
       toast.warning("Please fix the errors in the form.");
+      setIsSubmitting(false); // Reset submitting state
       return;
     }
 
     try {
-      // Prepare the FormData object
-      const formDataPayload = new FormData();
+      let uploadedFiles = []; // Default to empty array if no images are uploaded
 
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key === "images") {
-          // Append each image file individually
-          (value as File[]).forEach((file) => {
-            formDataPayload.append("images", file);
-          });
-        } else if (Array.isArray(value)) {
-          // For array fields, append each item separately
-          value.forEach((item) => formDataPayload.append(key, item));
-        } else {
-          // Append simple string fields
-          formDataPayload.append(key, value as string);
+      // Check if there are images to upload
+      if (formData.images && formData.images.length > 0) {
+        console.log("Uploading images...", formData.images);
+
+        // Create a FormData object and append all images
+        const imageFormData = new FormData();
+        formData.images.forEach((file) => {
+          imageFormData.append("images", file); // Append each image
+        });
+
+        // Upload all images in one request
+        const { data } = await axios.post(
+          `${process.env.NEXT_PUBLIC_BASE_URL}/file/uploads`,
+          imageFormData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+
+        // Ensure uploaded files exist in the response
+        if (!data || !data.files) {
+          throw new Error("No files returned from server.");
         }
+
+        console.log("Uploaded image data:", data.files);
+        uploadedFiles = data.files; // Assign uploaded files
+      }
+
+      // Prepare the post data
+      const postData: IPost = transformFormDataToIPost({
+        ...formData,
+        images: uploadedFiles, // Use server-returned file data or an empty array
       });
 
-      // Debugging FormData (Iterate to inspect content)
-      for (const pair of formDataPayload.entries()) {
-        console.log(pair[0], pair[1]);
-      }
-      console.log(formDataPayload);
+      console.log("Post data:", postData);
 
-      // Make the API call
-      const res = await createPost(formData).unwrap();
-      console.log("Response:", res);
+      // Submit the post data
+      await createPost(postData).unwrap();
 
-      // Success notification
       toast.success("Post created successfully!");
-      onClose(); // Close dialog on success
-    } catch (error) {
-      console.error("Error creating post:", error);
-      toast.error("Failed to create post. Please try again.");
+      onClose();
+    } catch (error: any) {
+      console.error("Error creating post: ", error);
+
+      // Display server error messages if available
+      if (error.response?.data?.message) {
+        toast.error(`Error: ${error.response.data.message}`);
+      } else {
+        toast.error("Failed to create post. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false); // Reset submitting state
     }
   };
 
@@ -201,7 +217,6 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
           onSubmit={handleSubmit}
           className="space-y-8 overflow-auto max-h-[75vh]"
         >
-          {/* Phone Number and Per Hour Rate */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <InputField
               label="Phone Number"
@@ -216,16 +231,23 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             <InputField
               label="Per Hour Rate"
               name="perHourRate"
-              placeholder="e.g., $100"
+              placeholder="e.g., Rs.1000"
               value={formData.perHourRate}
               onChange={handleInputChange}
             />
             {errors.perHourRate && (
               <span style={{ color: "red" }}>{errors.perHourRate}</span>
             )}
+            <InputField
+              label="Age"
+              name="age"
+              placeholder="e.g., 21"
+              value={formData.age}
+              onChange={handleInputChange}
+            />
+            {errors.age && <span style={{ color: "red" }}>{errors.age}</span>}
           </div>
 
-          {/* Description */}
           <TextareaField
             label="Title"
             name="title"
@@ -235,7 +257,6 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
           />
           {errors.title && <p className="error-text">{errors.title}</p>}
 
-          {/* Description */}
           <TextareaField
             label="Description"
             name="description"
@@ -247,7 +268,6 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             <span style={{ color: "red" }}>{errors.description}</span>
           )}
 
-          {/* Dropdowns */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SelectField
               label="Ethnicity"
@@ -259,16 +279,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             {errors.ethnicity && (
               <span style={{ color: "red" }}>{errors.ethnicity}</span>
             )}
-            <SelectField
-              label="Nationality"
-              options={nationalities}
-              name="nationality"
-              value={formData.nationality}
-              onChange={handleInputChange}
-            />
-            {errors.nationality && (
-              <span style={{ color: "red" }}>{errors.nationality}</span>
-            )}
+
             <SelectField
               label="State"
               options={states}
@@ -289,7 +300,6 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             {errors.city && <span style={{ color: "red" }}>{errors.city}</span>}
           </div>
 
-          {/* File Upload */}
           <div>
             <label className="block text-gray-700 mb-3 font-semibold">
               Upload Images
@@ -307,15 +317,7 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Dropdowns */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectField
-              label="Type of Service"
-              options={TYPE_OF_SERVICE}
-              name="typeOfService"
-              value={formData.typeOfService}
-              onChange={handleInputChange}
-            />
             <SelectField
               label="Breast Type"
               options={BREAST_TYPE}
@@ -339,7 +341,14 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             />
           </div>
 
-          {/* Checkbox Groups */}
+          <CheckboxGroup
+            label="Type of Service"
+            options={TYPE_OF_SERVICE}
+            selected={formData.typeOfService}
+            onChange={(value: string, checked: boolean) =>
+              handleCheckboxChange("typeOfService", value, checked)
+            }
+          />
           <CheckboxGroup
             label="Services"
             options={SERVICES}
@@ -376,13 +385,15 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
             <span style={{ color: "red" }}>{errors.paymentMethods}</span>
           )}
 
-          {/* Submit Button */}
           <div className="text-center">
             <Button
               type="submit"
-              className="w-full py-3 text-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg"
+              disabled={isSubmitting}
+              className={`w-full py-3 text-lg ${
+                isSubmitting ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
-              Submit Post
+              {isSubmitting ? "Submitting..." : "Create Post"}
             </Button>
           </div>
         </form>
@@ -390,99 +401,5 @@ const CreatePostDialog: React.FC<CreatePostDialogProps> = ({ onClose }) => {
     </Dialog>
   );
 };
-
-function InputField({
-  label,
-  ...props
-}: {
-  label: string;
-  [key: string]: any;
-}) {
-  return (
-    <div>
-      <label className="block text-gray-700 mb-2 font-medium">{label}</label>
-      <Input
-        className="w-full p-2 border rounded-lg focus:ring focus:ring-blue-300"
-        {...props}
-      />
-    </div>
-  );
-}
-
-function TextareaField({
-  label,
-  ...props
-}: {
-  label: string;
-  [key: string]: any;
-}) {
-  return (
-    <div>
-      <label className="block text-gray-700 mb-2 font-medium">{label}</label>
-      <Textarea
-        className="w-full p-2 border rounded-lg focus:ring focus:ring-blue-300"
-        {...props}
-      />
-    </div>
-  );
-}
-
-function CheckboxGroup({
-  label,
-  options,
-  selected,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  onChange: (value: string, checked: boolean) => void;
-}) {
-  return (
-    <div>
-      <h3 className="text-lg font-semibold mb-2 text-gray-700">{label}</h3>
-      <div className="flex flex-wrap gap-4">
-        {options.map((option) => (
-          <label key={option} className="flex items-center gap-2">
-            <Checkbox
-              checked={selected.includes(option)}
-              onCheckedChange={(checked) =>
-                onChange(option, checked as boolean)
-              }
-            />
-            {option}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  options,
-  ...props
-}: {
-  label: string;
-  options: string[];
-  [key: string]: any;
-}) {
-  return (
-    <div>
-      <label className="block text-gray-700 mb-2 font-medium">{label}</label>
-      <select
-        {...props}
-        className="w-full p-2 border rounded-lg focus:ring focus:ring-blue-300"
-      >
-        <option value="">Select</option>
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 export default CreatePostDialog;
